@@ -16,4 +16,14 @@ public class CustomerService {
         if(c==null) throw new CustomerNotFoundException("Customer "+id+" not found");
         return c;
     }
+
+    public void edit(String id, String newName, String newPhone, int newAge) throws CustomerNotFoundException {
+        Customer customer = find(id); // Sử dụng find() để kiểm tra sự tồn tại
+
+        customer.setName(newName);
+        customer.setPhone(newPhone);
+        customer.setAge(newAge);
+
+        repo.save();
+    }
 }

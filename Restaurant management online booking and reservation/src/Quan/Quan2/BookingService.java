@@ -1,14 +1,14 @@
 package Quan.Quan2;
 
 import Quan.Quan1.Booking;
-import Nam.BookingRepository1;
+import Nam.BookingRepository;
 import Quan.Quan3.TableAlreadyBookedException;
 
 import java.util.List;
 
 public class BookingService {
-    private BookingRepository1 repo;
-    public BookingService(BookingRepository1 repo){ this.repo=repo; }
+    private BookingRepository repo;
+    public BookingService(BookingRepository repo){ this.repo=repo; }
 
     public List<Booking> getAll(){ return repo.getAll(); }
 
