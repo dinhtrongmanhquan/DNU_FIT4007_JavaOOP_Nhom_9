@@ -6,8 +6,12 @@ import Quan.Quan3.*;
 import Quan.Quan2.*;
 import Quan.Menu.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.UUID;
 
@@ -18,7 +22,7 @@ public class Main {
     private static final CustomerRepository customerRepo = new CustomerRepository();
     private static final TableRepository tableRepo = new TableRepository();
     private static final MenuRepository menuRepo = new MenuRepository();
-    private static final BookingRepository1 bookingRepo = new BookingRepository1();
+    private static final BookingRepository bookingRepo = new BookingRepository();
     private static final InvoiceRepository invoiceRepo = new InvoiceRepository();
 
     // Khởi tạo Services
@@ -27,6 +31,9 @@ public class Main {
     private static final MenuService menuService = new MenuService(menuRepo);
     private static final BookingService bookingService = new BookingService(bookingRepo);
     private static final InvoiceService invoiceService = new InvoiceService(invoiceRepo);
+    // CHỨC NĂNG MỚI: Khởi tạo ReportService
+    private static final ReportService reportService = new ReportService(invoiceRepo);
+
 
     private static void loadAllData() {
         System.out.println("--- Đang nạp dữ liệu từ CSV...");
@@ -57,6 +64,8 @@ public class Main {
             System.out.println("2. Quản lý Thực đơn");
             System.out.println("3. Đặt bàn");
             System.out.println("4. Quản lý Hóa đơn");
+            System.out.println("5. Quản lý Khách hàng"); // THÊM MỚI
+            System.out.println("6. Thống kê & Báo cáo Doanh thu"); // THÊM MỚI
             System.out.println("0. Thoát & Lưu dữ liệu");
             System.out.print("Chọn chức năng: ");
             String choice = scanner.nextLine();
@@ -67,6 +76,8 @@ public class Main {
                     case "2": handleMenuManagement(); break;
                     case "3": handleBooking(); break;
                     case "4": handleInvoiceManagement(); break;
+                    case "5": handleCustomerManagement(); break; // THÊM MỚI
+                    case "6": handleReportManagement(); break; // THÊM MỚI
                     case "0":
                         saveAllData();
                         System.out.println("Ứng dụng đã thoát.");
@@ -79,22 +90,102 @@ public class Main {
         }
     }
 
+    // ----------------------------------------------------------------------
+// --- CHỨC NĂNG MỚI: QUẢN LÝ KHÁCH HÀNG (CRUD + EDIT) ---
 // ----------------------------------------------------------------------
+    private static void handleCustomerManagement() {
+        while (true) {
+            System.out.println("\n--- QUẢN LÝ KHÁCH HÀNG ---");
+            System.out.println("1. Hiển thị tất cả Khách hàng");
+            System.out.println("2. Thêm Khách hàng mới");
+            System.out.println("3. Sửa thông tin Khách hàng (theo ID)"); // CHỨC NĂNG SỬA
+            System.out.println("0. Quay lại Menu Chính");
+            System.out.print("Chọn: ");
+            String choice = scanner.nextLine();
 
-    // --- CHỨC NĂNG 1: QUẢN LÝ BÀN ĂN (CÓ LOOP VÀ QUAY LẠI) ---
+            if ("0".equals(choice)) break;
+
+            switch (choice) {
+                case "1":
+                    System.out.println("--- Danh sách Khách hàng ---");
+                    customerService.getAll().forEach(c -> {
+                        System.out.printf("ID: %s | Tên: %s | SĐT: %s | Tuổi: %d\n", c.getId(), c.getName(), c.getPhone(), c.getAge());
+                    });
+                    break;
+                case "2":
+                    try {
+                        String id = UUID.randomUUID().toString().substring(0, 4);
+                        System.out.print("Tên khách hàng: "); String name = scanner.nextLine();
+                        System.out.print("SĐT: "); String phone = scanner.nextLine();
+                        System.out.print("Tuổi: "); int age = Integer.parseInt(scanner.nextLine());
+                        customerService.add(new Customer(id, name, phone, age));
+                        customerRepo.save();
+                        System.out.println("Thêm khách hàng thành công! ID: " + id);
+                    } catch (NumberFormatException e) {
+                        System.err.println("Lỗi: Tuổi phải là số nguyên.");
+                    }
+                    break;
+                case "3": // CHỨC NĂNG SỬA
+                    System.out.print("Nhập ID Khách hàng cần sửa: ");
+                    String updateId = scanner.nextLine();
+                    try {
+                        Customer customerToUpdate = customerService.find(updateId);
+
+                        System.out.println("--- Sửa Khách hàng: " + customerToUpdate.getName() + " ---");
+
+                        System.out.printf("Tên mới (Hiện tại: %s, Bỏ qua nếu không đổi): ", customerToUpdate.getName());
+                        String newName = scanner.nextLine();
+
+                        System.out.printf("SĐT mới (Hiện tại: %s, Bỏ qua nếu không đổi): ", customerToUpdate.getPhone());
+                        String newPhone = scanner.nextLine();
+
+                        System.out.printf("Tuổi mới (Hiện tại: %d, Bỏ qua nếu không đổi): ", customerToUpdate.getAge());
+                        String newAgeStr = scanner.nextLine();
+                        int newAge = customerToUpdate.getAge(); // Giữ giá trị cũ
+
+                        if (!newAgeStr.trim().isEmpty()) {
+                            newAge = Integer.parseInt(newAgeStr);
+                        }
+
+                        // Gọi phương thức edit trong Service
+                        customerService.edit(updateId,
+                                newName.trim().isEmpty() ? customerToUpdate.getName() : newName,
+                                newPhone.trim().isEmpty() ? customerToUpdate.getPhone() : newPhone,
+                                newAge);
+
+                        customerRepo.save();
+                        System.out.println("Sửa Khách hàng thành công và đã lưu vào tệp.");
+
+                    } catch (CustomerNotFoundException e) {
+                        System.err.println("Lỗi: " + e.getMessage());
+                    } catch (NumberFormatException e) {
+                        System.err.println("Lỗi: Tuổi nhập vào không hợp lệ.");
+                    }
+                    break;
+                default: System.out.println("Lựa chọn không hợp lệ.");
+            }
+        }
+    }
+
+
+    // ----------------------------------------------------------------------
+// --- CHỨC NĂNG 1: QUẢN LÝ BÀN ĂN (BỔ SUNG EDIT) ---
+// ----------------------------------------------------------------------
     private static void handleTableManagement() {
         while (true) {
             System.out.println("\n--- QUẢN LÝ BÀN ĂN ---");
             System.out.println("1. Hiển thị tất cả Bàn");
             System.out.println("2. Thêm bàn mới");
             System.out.println("3. Xóa bàn theo ID");
+            System.out.println("4. Sửa trạng thái Bàn theo ID"); // THÊM CHỨC NĂNG SỬA
             System.out.println("0. Quay lại Menu Chính");
             System.out.print("Chọn: ");
             String choice = scanner.nextLine();
 
-            if ("0".equals(choice)) break; // Quay lại main menu
+            if ("0".equals(choice)) break;
 
             switch (choice) {
+                // ... (Case 1, 2, 3 giữ nguyên)
                 case "1":
                     System.out.println("--- Danh sách Bàn ---");
                     tableService.getAll().forEach(t -> {
@@ -124,7 +215,7 @@ public class Main {
                         }
 
                         tableService.add(newTable);
-                        tableRepo.save(); // LƯU NGAY LẬP TỨC
+                        tableRepo.save();
                         System.out.println("Thêm bàn thành công và đã lưu vào tệp.");
                     } catch (NumberFormatException e) {
                         System.err.println("Lỗi: Số chỗ ngồi phải là số nguyên.");
@@ -134,9 +225,44 @@ public class Main {
                     System.out.print("Nhập ID bàn cần xóa: "); String removeId = scanner.nextLine();
                     try {
                         tableService.remove(removeId);
-                        tableRepo.save(); // LƯU NGAY LẬP TỨC
+                        tableRepo.save();
                         System.out.println("Xóa bàn thành công và đã lưu vào tệp.");
                     } catch (TableNotFoundException e) {
+                        System.err.println("Lỗi: " + e.getMessage());
+                    }
+                    break;
+                case "4": // CHỨC NĂNG SỬA TRẠNG THÁI BÀN
+                    System.out.print("Nhập ID bàn cần sửa trạng thái: ");
+                    String updateId = scanner.nextLine();
+                    try {
+                        Table tableToUpdate = tableService.find(updateId);
+
+                        System.out.println("--- Sửa trạng thái Bàn: " + tableToUpdate.getId() + " (Hiện tại: " + tableToUpdate.getStatus() + ") ---");
+                        System.out.println("Chọn trạng thái mới:");
+                        System.out.println("  1. AVAILABLE (Trống)");
+                        System.out.println("  2. BOOKED (Đã đặt)");
+                        System.out.println("  3. OCCUPIED (Đang dùng)");
+                        System.out.print("Nhập số trạng thái mới (1, 2, hoặc 3): ");
+                        String statusChoice = scanner.nextLine();
+
+                        Table.Status newStatus;
+                        switch (statusChoice) {
+                            case "1": newStatus = Table.Status.AVAILABLE; break;
+                            case "2": newStatus = Table.Status.BOOKED; break;
+                            case "3": newStatus = Table.Status.OCCUPIED; break;
+                            default:
+                                System.err.println("Lỗi: Lựa chọn trạng thái không hợp lệ. Thao tác bị hủy.");
+                                return;
+                        }
+
+                        // Gọi phương thức edit trong Service (dùng lại cho việc set status)
+                        tableToUpdate.setStatus(newStatus);
+                        tableRepo.save();
+                        System.out.println("Cập nhật trạng thái Bàn thành công và đã lưu vào tệp.");
+
+                    } catch (TableNotFoundException e) {
+                        System.err.println("Lỗi: " + e.getMessage());
+                    } catch (Exception e) {
                         System.err.println("Lỗi: " + e.getMessage());
                     }
                     break;
@@ -145,9 +271,72 @@ public class Main {
         }
     }
 
+    // ----------------------------------------------------------------------
+// --- CHỨC NĂNG MỚI: THỐNG KÊ & BÁO CÁO DOANH THU ---
+// ----------------------------------------------------------------------
+    private static void handleReportManagement() {
+        while (true) {
+            System.out.println("\n--- THỐNG KÊ & BÁO CÁO DOANH THU ---");
+            System.out.println("1. Doanh thu theo khoảng ngày");
+            System.out.println("2. Doanh thu theo tháng (trong năm)");
+            System.out.println("3. Top các món bán chạy nhất");
+            System.out.println("0. Quay lại Menu Chính");
+            System.out.print("Chọn: ");
+            String choice = scanner.nextLine();
+
+            if ("0".equals(choice)) break;
+
+            try {
+                switch (choice) {
+                    case "1":
+                        System.out.print("Ngày bắt đầu (YYYY-MM-DD): "); String startStr = scanner.nextLine();
+                        System.out.print("Ngày kết thúc (YYYY-MM-DD): "); String endStr = scanner.nextLine();
+                        LocalDate startDate = LocalDate.parse(startStr);
+                        LocalDate endDate = LocalDate.parse(endStr);
+
+                        double totalRevenue = reportService.getTotalRevenue(startDate, endDate);
+                        System.out.printf("=> TỔNG DOANH THU từ %s đến %s: **%.0f VND**\n", startStr, endStr, totalRevenue);
+                        break;
+
+                    case "2":
+                        System.out.print("Nhập năm cần thống kê (YYYY): "); int year = Integer.parseInt(scanner.nextLine());
+                        Map<Month, Double> monthlyRevenue = reportService.getMonthlyRevenue(year);
+                        System.out.println("--- DOANH THU THEO THÁNG NĂM " + year + " ---");
+                        if (monthlyRevenue.isEmpty()) {
+                            System.out.println("Không có hóa đơn nào trong năm " + year + ".");
+                        } else {
+                            monthlyRevenue.forEach((month, total) ->
+                                    System.out.printf(" - %-10s: %.0f VND%n", month.toString(), total)
+                            );
+                        }
+                        break;
+
+                    case "3":
+                        System.out.print("Nhập số lượng món Top (ví dụ: 5): "); int limit = Integer.parseInt(scanner.nextLine());
+                        Map<String, Integer> topItems = reportService.getTopSellingItems(limit);
+                        System.out.println("--- TOP " + limit + " MÓN BÁN CHẠY NHẤT ---");
+                        int rank = 1;
+                        for (Map.Entry<String, Integer> entry : topItems.entrySet()) {
+                            System.out.printf(" %d. %-20s: %d lượt bán%n", rank++, entry.getKey(), entry.getValue());
+                        }
+                        break;
+
+                    default: System.out.println("Lựa chọn không hợp lệ.");
+                }
+            } catch (NumberFormatException e) {
+                System.err.println("Lỗi: Dữ liệu nhập vào phải là số nguyên hoặc số thực.");
+            } catch (DateTimeParseException e) {
+                System.err.println("Lỗi: Định dạng ngày tháng không hợp lệ (cần YYYY-MM-DD).");
+            }
+        }
+    }
+
+
+// ----------------------------------------------------------------------
+// --- CÁC CHỨC NĂNG CÒN LẠI (GIỮ NGUYÊN) ---
 // ----------------------------------------------------------------------
 
-    // --- CHỨC NĂNG 2: QUẢN LÝ THỰC ĐƠN (CÓ LOOP VÀ QUAY LẠI) ---
+    // --- CHỨC NĂNG 2: QUẢN LÝ THỰC ĐƠN ---
     private static void handleMenuManagement() {
         while (true) {
             System.out.println("\n--- QUẢN LÝ THỰC ĐƠN ---");
@@ -211,20 +400,22 @@ public class Main {
                         // Sửa Tên
                         System.out.printf("Tên mới (Hiện tại: %s, Bỏ qua nếu không đổi): ", itemToUpdate.getName());
                         String newName = scanner.nextLine();
-                        if (!newName.trim().isEmpty()) {
-                            itemToUpdate.setName(newName);
-                        }
 
                         // Sửa Giá
                         System.out.printf("Giá mới (Hiện tại: %.0f, Bỏ qua nếu không đổi): ", itemToUpdate.getPrice());
                         String newPriceStr = scanner.nextLine();
-                        if (!newPriceStr.trim().isEmpty()) {
-                            itemToUpdate.setPrice(Double.parseDouble(newPriceStr));
-                        }
 
                         // Sửa Giảm giá
                         System.out.printf("Giảm giá mới (0-1.0) (Hiện tại: %.1f, Bỏ qua nếu không đổi): ", itemToUpdate.getDiscount());
                         String newDiscStr = scanner.nextLine();
+
+                        // Cập nhật các trường
+                        if (!newName.trim().isEmpty()) {
+                            itemToUpdate.setName(newName);
+                        }
+                        if (!newPriceStr.trim().isEmpty()) {
+                            itemToUpdate.setPrice(Double.parseDouble(newPriceStr));
+                        }
                         if (!newDiscStr.trim().isEmpty()) {
                             itemToUpdate.setDiscount(Double.parseDouble(newDiscStr));
                         }
@@ -259,9 +450,7 @@ public class Main {
         }
     }
 
-// ----------------------------------------------------------------------
-
-    // --- CHỨC NĂNG 3: ĐẶT BÀN (SINGLE ACTION) ---
+    // --- CHỨC NĂNG 3: ĐẶT BÀN ---
     private static void handleBooking() {
         System.out.println("\n--- ĐẶT BÀN TRỰC TUYẾN ---");
         // BƯỚC 1: Chọn bàn (Chỉ hiển thị bàn AVAILABLE hoặc BOOKED để đặt thêm)
@@ -322,9 +511,7 @@ public class Main {
         }
     }
 
-// ----------------------------------------------------------------------
-
-    // --- CHỨC NĂNG 4: QUẢN LÝ HÓA ĐƠN (CÓ LOOP VÀ QUAY LẠI) ---
+    // --- CHỨC NĂNG 4: QUẢN LÝ HÓA ĐƠN ---
     private static void handleInvoiceManagement() {
         while (true) {
             System.out.println("\n--- QUẢN LÝ HÓA ĐƠN ---");
@@ -358,7 +545,6 @@ public class Main {
                         Table currentTable = tableService.find(tableId);
 
                         // Thiết lập trạng thái bàn đang phục vụ (hoặc OCCUPIED nếu cần)
-                        // Giả định bàn đã được phục vụ (OCCUPIED) hoặc BOOKED
                         currentTable.setStatus(Table.Status.OCCUPIED);
 
                         System.out.print("Tên khách hàng: "); String customerName = scanner.nextLine();
